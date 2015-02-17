@@ -21,13 +21,17 @@ import nl.sense_os.service.commonsense.SenseApi;
 import nl.sense_os.service.constants.SenseDataTypes;
 import nl.sense_os.service.constants.SensePrefs;
 
-public class SenseController extends AsyncTask<SenseApplication, Void, Void> {
+public class SenseController  {
     private SenseApplication mApplication;
     private static final String DEMO_SENSOR_NAME = "GT-I9300";
     public static final String TAG = "SenseController";
 
+    private JSONArray localData;
+    private JSONArray remoteData;
+
     public SenseController(SenseApplication application) {
         mApplication = application;
+        setPreferences();
     }
 
     public void startSense() {
@@ -49,32 +53,6 @@ public class SenseController extends AsyncTask<SenseApplication, Void, Void> {
 
     public void flushData() {
         mApplication.getSensePlatform().flushData();
-    }
-
-    @Override
-    protected Void doInBackground(SenseApplication... params) {
-        startSense();
-        setPreferences();
-        //getAllSensors();
-        return null;
-    }
-
-    private JSONArray getAllSensors() {
-        //String data = SenseApi.getDefaultDeviceType(mApplication.getBaseContext());
-        //System.out.println(data);
-
-        JSONArray data;
-
-        try {
-           data = SenseApi.getAllSensors(mApplication.getBaseContext());
-           return data;
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-
-        return null;
     }
 
     /**
@@ -103,64 +81,46 @@ public class SenseController extends AsyncTask<SenseApplication, Void, Void> {
         }.start();
     }
 
-    private void registerSensors(Context context, String sensorName, String displayName, String description,
-                                String dataType, String value, String deviceType, String deviceUuid) {
+    public JSONArray getLocalData() {
+        localData = null;
 
-        SensorManager sm = (SensorManager) mApplication.getBaseContext().getSystemService(Context.SENSOR_SERVICE);
-        List<Sensor> allSensors = sm.getSensorList(Sensor.TYPE_ALL);
-
-        JSONArray registeredSensors = getAllSensors();
-
-        try {
-            for(int i = 0; i < allSensors.size(); i++) {
-                for(int j = 0; j < allSensors.size(); j++) {
-                        if(registeredSensors.getJSONObject(j).getString("name") == allSensors.get(j).getName()) {
-                            // Don't register if the sensor is already registered.
-                            continue;
-                        }
-
-                    Sensor sensor = allSensors.get(i);
-                    SenseApi.registerSensor(mApplication.getApplicationContext(), sensor.getName(), sensor.getName(), "", SenseDataTypes.INT , Float.toString(sensor.getMaximumRange()), null, null);
+        new Thread() {
+            public void run() {
+                try {
+                    localData = mApplication.getSensePlatform().getLocalData("accelerometer", 10);
+                    Log.d(TAG, localData.toString());
+                } catch (IllegalStateException e) {
+                    Log.w(TAG, "Failed to query remote data", e);
+                } catch (JSONException e) {
+                    Log.w(TAG, "Failed to parse remote data", e);
                 }
-            }
-        } catch (JSONException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+            };
+        }.start();
+
+        return localData;
     }
 
-    public void getLocalData() {
-
-        JSONArray data;
-        try {
-            data = mApplication.getSensePlatform().getLocalData("acceleration", 100);
-            Log.d(TAG, data.toString());
-        } catch (IllegalStateException e) {
-            Log.w(TAG, "Failed to query remote data", e);
-        } catch (JSONException e) {
-            Log.w(TAG, "Failed to parse remote data", e);
-        }
-    }
-
-    private void registerSensor() {
-
-    }
-
-    private void getRemoteData() {
+    private JSONArray getRemoteData() {
         Log.v(TAG, "Get data from CommonSense");
-        long startDate = new Date().getTime();
-        long endDate = new Date().getTime();
+        remoteData = null;
 
-        JSONArray data;
-        try {
-            data = mApplication.getSensePlatform().getData(DEMO_SENSOR_NAME, true, 10, startDate, endDate);
+        new Thread() {
+            public void run() {
+                long startDate = new Date().getTime(); //TODO: Get correct date
+                long endDate = new Date().getTime(); //TODO: Get correct date
 
-        } catch (IllegalStateException e) {
-            Log.w(TAG, "Failed to query remote data", e);
-        } catch (JSONException e) {
-            Log.w(TAG, "Failed to parse remote data", e);
-        }
+                try {
+                    remoteData = mApplication.getSensePlatform().getData(DEMO_SENSOR_NAME, true, 10, startDate, endDate);
+                } catch (IllegalStateException e) {
+                    Log.w(TAG, "Failed to query remote data", e);
+                } catch (JSONException e) {
+                    Log.w(TAG, "Failed to parse remote data", e);
+                }
+            };
+        }.start();
+
+
+        return remoteData;
     }
 
     /**

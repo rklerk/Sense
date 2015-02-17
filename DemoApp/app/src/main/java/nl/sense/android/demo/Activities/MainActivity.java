@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Handler;
+import android.os.RemoteException;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -116,6 +117,7 @@ public class MainActivity extends ActionBarActivity {
 
         mApplication = (SenseApplication) getApplication();
         senseController = new SenseController(mApplication);
+        senseController.startSense();
 
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
@@ -166,13 +168,17 @@ public class MainActivity extends ActionBarActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        senseController.execute();
         Log.i(TAG, "Connecting...");
     }
 
     @Override
     protected void onStop() {
         super.onStop();
+        try {
+            mApplication.getSensePlatform().logout();
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
         senseController.stopSense();
     }
 
